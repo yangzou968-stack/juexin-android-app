@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.JuexinAssistant" parent="Theme.AppCompat.Light.NoActionBar">
+        <item name="colorPrimary">#D4A574</item>
+        <item name="colorPrimaryDark">#8D6E63</item>
+        <item name="colorAccent">#C9A96E</item>
+        <item name="android:statusBarColor">#FFF8F0</item>
+        <item name="android:windowBackground">#FFF8F0</item>
+    </style>
+</resources>

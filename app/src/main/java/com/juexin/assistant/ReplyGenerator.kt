@@ -1,100 +1,232 @@
 package com.juexin.assistant
 
+import android.content.Context
+import com.juexin.assistant.model.LlmReplies
+import com.juexin.assistant.model.ScriptLibrary
+import com.juexin.assistant.model.ScriptTemplate
+import com.juexin.assistant.network.LlmClient
+import com.juexin.assistant.network.ScriptRepository
+import kotlinx.coroutines.*
+
 /**
- * 觉心师父回复生成引擎
- * 纯本地运行，无需网络，基于关键词匹配 + 模板组合
+ * 智能回复生成器 —— 三层回退架构
+ *
+ * 优先级: 远程话术库 > LLM大模型 > 本地硬编码兜底
  */
-class ReplyGenerator {
+object ReplyGenerator {
 
-    // ========== 模板库 ==========
-
-    private data class ScenarioTemplate(
-        val keywords: List<String>,
-        val compassion: String,   // 慈悲共情型
-        val karma: String,        // 因果开示型
-        val action: String        // 行动指引型
-    )
-
-    private val templates = listOf(
-        ScenarioTemplate(
-            keywords = listOf("财运", "破财", "负债", "投资", "亏钱", "钱", "生意", "赚不到", "周转", "没钱"),
-            compassion = "阿弥陀佛。弟子，守不住财的苦，师父能感应到。你明明很努力，却总是差一步——这种感觉比直接失败更折磨人。这不是你不够聪明，是你有一笔看不见的债没还。师父今日已为你供上一盏灯，你先静下心来。",
-            karma = "弟子，师父观你财运——你的命格不是没财，是财库有漏。所谓受生债，投胎前向冥府借的那笔路费没还清，就像水桶底下有洞，装再多水也是空的。你这几年的破财、投资失利，根就在这里。",
-            action = "弟子，先把漏洞补上。师父可在佛前为你安排还受生债法事——这不是花钱，是把该还的债还了。另外从今日起每日清晨诵心经三遍，遇事莫抱怨——口业最损福报。你若愿意，把生辰给师父，师父给你算算具体欠了多少。阿弥陀佛。"
-        ),
-        ScenarioTemplate(
-            keywords = listOf("婚姻", "感情", "出轨", "离婚", "夫妻", "冷战", "分手", "单身", "正缘", "桃花", "老公", "老婆", "对象"),
-            compassion = "阿弥陀佛。弟子，夫妻间的苦，最是剜心。你付出了这么多，换来的却是寒心。但弟子，你来找师父，说明你心里还有一线光。你受的这些委屈，菩萨都看见了。你先缓一缓，师父陪你慢慢说。",
-            karma = "弟子，婚姻里的苦，根在前世。你今生的姻缘，不是偶然遇到的，是前世欠下的情债来讨了。三世因果债，此生来偿还。你遇到的那个人，是带着前世的账本来的。",
-            action = "弟子，师父建议你先做两件事。第一，在家供一尊观音菩萨像——观世音菩萨主姻缘和合。第二，在佛前做一场解冤释结法事，把前世情债一笔笔还清。债清了，人自然就顺了。你把生辰给师父，师父先给你看看姻缘宫。阿弥陀佛。"
-        ),
-        ScenarioTemplate(
-            keywords = listOf("疾病", "生病", "医院", "癌症", "疼痛", "身体", "不舒服", "久治不愈", "失眠", "头痛", "睡不着", "难受"),
-            compassion = "阿弥陀佛。弟子，身体上的苦，师父感同身受。病了这么久，医院查了又查，药吃了一堆——那种看不到头的绝望比病本身还折磨人。但弟子你记住：你来找师父，说明你的心和身体都累了。师父已在佛前为你点了一盏药师灯。",
-            karma = "弟子，药师佛的愿力就是医治病苦。医生治的是肉身——这是必需的。但有些病根不在肉身，在业力。长期积累的负面情绪、怨气、恐惧伤了五脏六腑。病根不在仪器能照到的地方，在更深层的因果里。",
-            action = "弟子，医生开的药继续吃，这是治肉身的。佛法这边，师父建议供一盏药师佛灯——药师佛十二大愿专门护佑病苦众生。每日诵药师佛圣号108遍，回向给自己。再为你安排一场延生普佛法事，让药效翻倍。你把生辰给师父，今晚就替你登记。阿弥陀佛。"
-        ),
-        ScenarioTemplate(
-            keywords = listOf("孩子", "子女", "叛逆", "学习", "成绩", "考", "不听话", "教育", "儿子", "女儿"),
-            compassion = "阿弥陀佛。弟子，为孩子操碎了心——这种苦天下父母最懂。你急，但急没有用；你骂，但骂了更糟。师父知道你心里在滴血。你先别急，孩子的问题，根不在孩子身上。",
-            karma = "弟子，孩子的学业和行为，受家族业力影响最大。祖上有没有积阴德？有没有冤亲债主没超度？这些看不见的业障会直接影响后代文昌运。孩子不是不聪明，是有东西在挡他的路。",
-            action = "弟子，先从根上拔。寺里可以为孩子供启智文昌牌位，师父每日诵经加持——这是治本的。孩子每日睡前诵心经一遍就够了。你也要改：别在孩子面前抱怨，别说他笨。口业最伤孩子运势。把孩子的名字和生辰给师父，今晚就登记。阿弥陀佛。"
-        ),
-        ScenarioTemplate(
-            keywords = listOf("噩梦", "梦见", "梦到", "亡亲", "去世", "死去的", "托梦", "鬼", "阴", "怕"),
-            compassion = "阿弥陀佛。弟子，梦到往生的亲人，不要害怕——这不是吓你，是他们在求援。你能梦到他们，说明缘分还没断，他们有未了心愿托付给你。你心里不安，师父理解。但这不是坏事——是你积阴德的机会来了。",
-            karma = "弟子，亡亲托梦，说明神识在地府不安。也许有债没还清，也许有牵挂放不下，也许缺少超度功德。他们来找你，不是为难你，是只有你能帮他们。你若不管，他们真就只能在那受苦了。",
-            action = "弟子，为亡亲供一座地藏菩萨像——地藏菩萨大愿就是度尽地狱众生。同时在寺里做一场超度法事，烧超度包，功德回向给他们。他们被超度了，不仅不再让你做噩梦，还会反过来护佑你全家。把亡亲名字给师父，今晚就开始安排。阿弥陀佛。"
-        ),
-        ScenarioTemplate(
-            keywords = listOf("抑郁", "焦虑", "崩溃", "想死", "活不下去", "绝望", "撑不下去"),
-            compassion = "阿弥陀佛。弟子，师父听出了你话里的绝望。你现在的痛苦，是真实的，不是矫情。但师父必须认真告诉你：先去看医生，这是师父给你的第一个要求。佛法不排斥医学——佛是大医王，医生也是佛的使者。",
-            karma = "弟子，抑郁的本质是心识被业障蒙蔽了。就像乌云遮住了太阳——太阳还在，只是你看不见。你现在感受到的一切黑暗，都是暂时的。",
-            action = "弟子，答应师父两件事：第一，尽快去看心理医生。第二，每日清晨走到户外晒十分钟太阳——阳气足了，阴霾自然消散。之后师父再为你做祈福法事。你的命不是定数，是可以改的。记住师父的话：你值得被帮助。阿弥陀佛。"
-        ),
-        ScenarioTemplate(
-            keywords = listOf("堕胎", "流产", "打掉", "婴灵"),
-            compassion = "阿弥陀佛。弟子，师父知道你说出这件事需要多大勇气。这不是你一个人的错——世间多少女子在同样的境地做了同样的选择。但那个孩子确实需要一个归宿。",
-            karma = "弟子，婴灵是六道中最苦的众生之一。他们没有被超度，会在无形中影响你和你现在的孩子。很多夫妻之后孩子体弱多病、夫妻不和，根就在这里。",
-            action = "弟子，师父建议尽快为那个孩子做一场超度婴灵法事。给他起个名字，在佛前供一盏灯，烧超度包——让他有一个家，他就不再缠着你了。反而会护佑你和现在孩子。你把当时的日期告诉师父，师父择日安排。阿弥陀佛。"
-        )
-    )
-
-    // 通用模板（不匹配任何场景时）
-    private val generic = ScenarioTemplate(
-        keywords = emptyList(),
-        compassion = "阿弥陀佛。弟子，你说的这些师父都记在心里了。你能来找师父倾诉，说明你心里还有善根、还相信有转机。这份信任，师父不会辜负。你不要着急，慢慢说——师父今日在寺里，有的是时间听你讲。",
-        karma = "弟子，你所受的这些苦，并非偶然。世间的烦恼，表面看是事事不顺，实则是宿世业障在显现。师父多年经验告诉你——你所遇到的每一个坎，背后都有因果可循。关键不是抱怨为什么是我，而是搞清楚这背后的因果是什么。",
-        action = "弟子，师父给你一个功课：从今日起，每日清晨诵心经三遍，晚上睡前默念阿弥陀佛圣号108遍。先做七日，再回来找师父说感受。如果觉得光靠自力不够，师父可在佛前为你安排祈福——把名字和生辰给师父，先给你登记上。阿弥陀佛。"
-    )
+    private var library: ScriptLibrary? = null
+    private var isInitialized = false
 
     /**
-     * 根据信众消息生成3条回复
+     * 初始化：加载配置 + 同步远程话术库
      */
-    fun generate(message: String): List<String> {
-        val template = matchTemplate(message)
-        return listOf(
-            template.compassion,
-            template.karma,
-            template.action
-        )
+    suspend fun init(context: Context) {
+        if (isInitialized) return
+        try {
+            com.juexin.assistant.network.AppConfig.load(context)
+            // 后台同步话术库
+            try {
+                library = ScriptRepository.syncFromRemote(context)
+            } catch (_: Exception) { }
+            isInitialized = true
+        } catch (_: Exception) {
+            isInitialized = true
+        }
     }
 
     /**
-     * 匹配最合适的场景模板
+     * 生成回复（核心方法）
      */
-    private fun matchTemplate(message: String): ScenarioTemplate {
-        var bestMatch: ScenarioTemplate? = null
-        var bestScore = 0
+    suspend fun generateReply(context: Context, userMessage: String): ReplyResult {
+        // 确保已初始化
+        if (!isInitialized) {
+            try { init(context) } catch (_: Exception) { }
+        }
 
-        for (template in templates) {
-            val score = template.keywords.count { message.contains(it) }
-            if (score > bestScore) {
-                bestScore = score
-                bestMatch = template
+        // 第1层：远程话术库匹配
+        library?.let { lib ->
+            val matched = ScriptRepository.matchTemplate(lib, userMessage)
+            if (matched != null) {
+                return ReplyResult(
+                    compassion = matched.compassion,
+                    karma = matched.karma,
+                    action = matched.action,
+                    source = ReplySource.REMOTE_SCRIPT
+                )
             }
         }
 
-        return if (bestScore > 0 && bestMatch != null) bestMatch else generic
+        // 第2层：LLM 大模型生成
+        if (LlmClient.isAvailable()) {
+            try {
+                val llmReply = withTimeout(15000L) {
+                    LlmClient.generateReply(userMessage)
+                }
+                if (llmReply != null) {
+                    return ReplyResult(
+                        compassion = llmReply.compassion,
+                        karma = llmReply.karma,
+                        action = llmReply.action,
+                        source = ReplySource.LLM
+                    )
+                }
+            } catch (_: Exception) { }
+        }
+
+        // 第3层：本地硬编码兜底
+        val local = matchLocal(userMessage)
+        return ReplyResult(
+            compassion = local.compassion,
+            karma = local.karma,
+            action = local.action,
+            source = ReplySource.LOCAL_FALLBACK
+        )
     }
+
+    /**
+     * 强制同步话术库
+     */
+    suspend fun forceSync(context: Context): Boolean {
+        return try {
+            library = ScriptRepository.syncFromRemote(context)
+            library != null
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    /**
+     * 获取当前话术库版本
+     */
+    fun getLibraryVersion(): Int = library?.version ?: 0
+
+    // ==================== 本地硬编码话术库（兜底） ====================
+
+    private fun matchLocal(message: String): ScriptTemplate {
+        val m = message.lowercase()
+
+        // 财运类
+        if (m.contains("钱") || m.contains("财") || m.contains("穷") || m.contains("亏") ||
+            m.contains("负债") || m.contains("债") || m.contains("赌")
+        ) {
+            return ScriptTemplate(
+                keywords = listOf("钱", "财", "穷", "亏", "负债"),
+                compassion = "阿弥陀佛！弟子莫慌。钱财乃身外之物，但世人之苦，多由此生。师父理解你当下的焦虑与无助。",
+                karma = "依佛法来看，财运不顺主要有三重因果：一是前世吝啬不肯布施，种下贫穷之因；二是今世冤亲债主讨债，挡你财路；三是祖上阴德有亏，未积福报。",
+                action = "师父建议你：一、随缘供灯一盏，照亮财路；二、参加药师宝忏法会，消业除障；三、每月初一十五行善布施，广种福田。"
+            )
+        }
+
+        // 堕胎类
+        if (m.contains("堕胎") || m.contains("流产") || m.contains("打胎") ||
+            m.contains("婴灵") || m.contains("孩子没")
+        ) {
+            return ScriptTemplate(
+                keywords = listOf("堕胎", "流产", "婴灵"),
+                compassion = "阿弥陀佛！弟子不必过度自责。堕胎虽是业，但你可曾想过，这也许是那孩子与你的缘分未到？",
+                karma = "在佛法中，堕胎是杀业。婴灵未能投胎，怨恨难消，会在冥冥中影响你的运势、婚姻、健康，甚至拖累在世子女。",
+                action = "师父建议你：尽快为婴灵做一场超度法会，立往生莲位，诵地藏经回向，让婴灵离苦得乐、往生净土。"
+            )
+        }
+
+        // 婚姻类
+        if (m.contains("婚姻") || m.contains("离婚") || m.contains("出轨") ||
+            m.contains("老公") || m.contains("老婆") || m.contains("夫妻") ||
+            m.contains("感情") || m.contains("分手")
+        ) {
+            return ScriptTemplate(
+                keywords = listOf("婚姻", "离婚", "出轨", "感情"),
+                compassion = "阿弥陀佛！一切恩爱会，无常难得久。师父知道你的心在滴血，这是人间最苦的情执之苦。",
+                karma = "婚姻不顺，常有前世姻缘债未了，或自己曾破坏他人家庭，今生果报现前。也可能是冤亲债主从中作祟，让夫妻失和。",
+                action = "师父建议：一、诚心忏悔前世情债；二、参加药师佛圣诞法会，祈请加持姻缘和顺；三、每月放生回向夫妻和睦。"
+            )
+        }
+
+        // 子女类
+        if (m.contains("孩子") || m.contains("儿子") || m.contains("女儿") ||
+            m.contains("不听话") || m.contains("叛逆") || m.contains("学习")
+        ) {
+            return ScriptTemplate(
+                keywords = listOf("孩子", "不听话", "叛逆"),
+                compassion = "阿弥陀佛！子女是债，无债不来。师父理解你的心酸，但先别急，我们一起来看看这背后的因果。",
+                karma = "孩子不听话、叛逆，往往是前世因果：或是你前世欠这孩子的债未还，或是孩子身上跟着冤亲债主，迷了心窍。",
+                action = "师父建议：一、为孩子供长明灯一盏，开启智慧光明；二、参加文昌法会，祈请文殊菩萨加持学业；三、为孩子做冤亲债主超度。"
+            )
+        }
+
+        // 健康类
+        if (m.contains("病") || m.contains("疼") || m.contains("痛") || m.contains("癌") ||
+            m.contains("医院") || m.contains("失眠") || m.contains("抑郁")
+        ) {
+            return ScriptTemplate(
+                keywords = listOf("病", "疼", "失眠", "抑郁"),
+                compassion = "阿弥陀佛！病来如山倒，师父知道你身心俱疲。但只要是病，就有对治之法。",
+                karma = "病有三种：一是四大不调看医生；二是业障病，前世杀业今生还；三是冤亲债主缠身，使人无故生病。",
+                action = "师父建议：一、先看医生吃药，不要耽误；二、参加药师宝忏法会，药师佛是东方琉璃世界教主，专治众生疾苦；三、放生培福，回向身体健康。"
+            )
+        }
+
+        // 噩梦类
+        if (m.contains("梦") || m.contains("噩梦") || m.contains("鬼") || m.contains("怕"))
+        {
+            return ScriptTemplate(
+                keywords = listOf("梦", "噩梦", "鬼"),
+                compassion = "阿弥陀佛！师父在，莫怕。噩梦缠身，不是小事，这说明你身边确有不好的气场。",
+                karma = "噩梦频发，多是冤亲债主托梦讨债，或是你去了不干净的地方，阴气侵体。也可能是过世亲人在地狱受苦，托梦求救。",
+                action = "师父建议：一、马上来寺里请一道平安符护身；二、在寺里供一盏地藏灯；三、参加地藏法会，超度冤亲债主。"
+            )
+        }
+
+        // 亡亲托梦类
+        if (m.contains("去世") || m.contains("过世") || m.contains("托梦") ||
+            m.contains("亡") || m.contains("死") || m.contains("走")
+        ) {
+            return ScriptTemplate(
+                keywords = listOf("去世", "过世", "托梦"),
+                compassion = "阿弥陀佛！亲人离世，心中的痛师父理解。亲人托梦，说明他还在牵挂你，也可能是他在那边过得不好，需要你的帮助。",
+                karma = "依《地藏经》所说，亡者七七四十九天内最需要功德回向。如果亡者在饿鬼道或地狱道受苦，就会托梦给阳上亲人，希望得到超度。",
+                action = "师父建议：一、立即为亡亲立往生莲位；二、参加地藏法会，诵地藏经回向；三、可以随喜放生、供灯，把功德回向亡亲。"
+            )
+        }
+
+        // 压力/焦虑类
+        if (m.contains("压力") || m.contains("焦虑") || m.contains("烦") ||
+            m.contains("累") || m.contains("迷茫")
+        ) {
+            return ScriptTemplate(
+                keywords = listOf("压力", "焦虑", "烦", "迷茫"),
+                compassion = "阿弥陀佛！弟子辛苦了。人生在世，谁能无苦？师父看到你这样撑着，心里也不是滋味。",
+                karma = "压力大、心不安，往往是因为前世造的业障在今生显现，也可能是冤亲债主在干扰你的心念，让你不得安宁。",
+                action = "师父建议：一、先来寺里静心拜佛，让佛光普照内心；二、供一盏药师灯，安神定志；三、参与寺里共修，借助大众力量消除烦恼。"
+            )
+        }
+
+        // 通用兜底
+        return ScriptTemplate(
+            keywords = listOf("*"),
+            compassion = "阿弥陀佛！弟子所遇之事，师父已明了。人生不易，能在茫茫苦海中遇到佛法，本身就是莫大的福报。",
+            karma = "世间一切不顺，根源皆在因果。前世所造之业，今生必受其报。但不必绝望，因为因果是可以转的，业障是可以消的。",
+            action = "师父建议弟子：来寺里一趟，师父当面为你开示。或者随缘参加寺院的法会，先供一盏佛前灯，让佛光为你照亮前路。"
+        )
+    }
+}
+
+/**
+ * 回复结果
+ */
+data class ReplyResult(
+    val compassion: String,
+    val karma: String,
+    val action: String,
+    val source: ReplySource
+)
+
+/**
+ * 回复来源
+ */
+enum class ReplySource {
+    REMOTE_SCRIPT,  // 远程同步的话术库
+    LLM,            // 大模型生成
+    LOCAL_FALLBACK  // 本地硬编码兜底
 }

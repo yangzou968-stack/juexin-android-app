@@ -1,120 +1,109 @@
 package com.juexin.assistant
 
-import android.app.AlertDialog
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.widget.Button
+import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import com.juexin.assistant.databinding.ActivityMainBinding
+import com.juexin.assistant.network.ScriptRepository
+import com.juexin.assistant.ui.SettingsActivity
+import kotlinx.coroutines.*
 
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var binding: ActivityMainBinding
+    private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        binding = ActivityMainBinding.inflate(layoutInflater)
-        setContentView(binding.root)
+        setContentView(R.layout.activity_main)
 
-        setupUI()
-        checkPermissions()
-    }
+        val btnStart = findViewById<Button>(R.id.btn_start_service)
+        val btnStop = findViewById<Button>(R.id.btn_stop_service)
+        val btnSettings = findViewById<Button>(R.id.btn_settings)
+        val tvStatus = findViewById<TextView>(R.id.tv_service_status)
+        val tvScriptInfo = findViewById<TextView>(R.id.tv_script_info)
 
-    private fun setupUI() {
-        binding.btnFloatingPermission.setOnClickListener {
-            requestFloatingWindowPermission()
+        updateUI(btnStart, btnStop, tvStatus)
+
+        btnStart.setOnClickListener {
+            if (!checkOverlayPermission()) {
+                requestOverlayPermission()
+                return@setOnClickListener
+            }
+            val intent = Intent(this, FloatingBallService::class.java)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(intent)
+            } else {
+                startService(intent)
+            }
+            Toast.makeText(this, "悬浮球已启动", Toast.LENGTH_SHORT).show()
+            updateUI(btnStart, btnStop, tvStatus)
         }
 
-        binding.btnStartService.setOnClickListener {
-            if (checkFloatingPermission()) {
-                startServices()
-                updateStatus(true)
-            } else {
-                requestFloatingWindowPermission()
+        btnStop.setOnClickListener {
+            val intent = Intent(this, FloatingBallService::class.java)
+            intent.action = FloatingBallService.ACTION_STOP
+            startService(intent)
+            updateUI(btnStart, btnStop, tvStatus)
+        }
+
+        btnSettings.setOnClickListener {
+            startActivity(Intent(this, SettingsActivity::class.java))
+        }
+
+        // 初始化并加载话术库信息
+        scope.launch {
+            try {
+                ReplyGenerator.init(this@MainActivity)
+                val version = ScriptRepository.getCachedVersion(this@MainActivity)
+                if (version > 0) {
+                    tvScriptInfo.text = "云端话术库 v$version"
+                } else {
+                    tvScriptInfo.text = "本地话术库（点击设置同步云端）"
+                }
+            } catch (_: Exception) {
+                tvScriptInfo.text = "本地话术库"
             }
         }
-
-        binding.btnStopService.setOnClickListener {
-            stopServices()
-            updateStatus(false)
-        }
-
-        // 初始状态检查
-        if (FloatingBallService.isRunning) {
-            updateStatus(true)
-        }
     }
 
-    private fun checkPermissions() {
-        if (!checkFloatingPermission()) {
-            showPermissionDialog()
-        }
+    private fun updateUI(btnStart: Button, btnStop: Button, tvStatus: TextView) {
+        val isRunning = FloatingBallService.getInstance() != null
+        btnStart.isEnabled = !isRunning
+        btnStop.isEnabled = isRunning
+        tvStatus.text = if (isRunning) "● 服务运行中" else "○ 服务未启动"
     }
 
-    private fun checkFloatingPermission(): Boolean {
+    private fun checkOverlayPermission(): Boolean {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             Settings.canDrawOverlays(this)
-        } else {
-            true
-        }
+        } else true
     }
 
-    private fun requestFloatingWindowPermission() {
+    private fun requestOverlayPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             val intent = Intent(
                 Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                 Uri.parse("package:$packageName")
             )
-            startActivity(intent)
+            startActivityForResult(intent, 1001)
         }
-    }
-
-    private fun startServices() {
-        val floatingIntent = Intent(this, FloatingBallService::class.java)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(floatingIntent)
-        } else {
-            startService(floatingIntent)
-        }
-
-        val clipboardIntent = Intent(this, ClipboardService::class.java)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(clipboardIntent)
-        } else {
-            startService(clipboardIntent)
-        }
-    }
-
-    private fun stopServices() {
-        stopService(Intent(this, FloatingBallService::class.java))
-        stopService(Intent(this, ClipboardService::class.java))
-    }
-
-    private fun updateStatus(running: Boolean) {
-        binding.tvStatus.text = if (running) "● 助手运行中" else "○ 助手已停止"
-        binding.btnStartService.isEnabled = !running
-        binding.btnStopService.isEnabled = running
-    }
-
-    private fun showPermissionDialog() {
-        AlertDialog.Builder(this)
-            .setTitle("需要悬浮窗权限")
-            .setMessage(
-                "觉心助手需要在微信等应用上层显示悬浮球，\n\n" +
-                "这样你就能在任何应用中快速生成回复。\n\n" +
-                "请点击「去授权」→ 找到「觉心助手」→ 开启允许显示在其他应用上层。"
-            )
-            .setPositiveButton("去授权") { _, _ -> requestFloatingWindowPermission() }
-            .setNegativeButton("稍后", null)
-            .show()
     }
 
     override fun onResume() {
         super.onResume()
-        if (checkFloatingPermission()) {
-            updateStatus(FloatingBallService.isRunning)
-        }
+        val btnStart = findViewById<Button>(R.id.btn_start_service)
+        val btnStop = findViewById<Button>(R.id.btn_stop_service)
+        val tvStatus = findViewById<TextView>(R.id.tv_service_status)
+        updateUI(btnStart, btnStop, tvStatus)
+    }
+
+    override fun onDestroy() {
+        scope.cancel()
+        super.onDestroy()
     }
 }

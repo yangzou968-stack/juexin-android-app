@@ -1,141 +1,147 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#FDF5E6">
+    android:orientation="vertical"
+    android:gravity="center_horizontal"
+    android:padding="24dp"
+    android:background="#FFF8F0">
 
+    <!-- 顶部图标 -->
+    <ImageView
+        android:layout_width="80dp"
+        android:layout_height="80dp"
+        android:src="@mipmap/ic_launcher"
+        android:layout_marginTop="40dp"
+        android:layout_marginBottom="16dp"
+        android:contentDescription="觉心佛法助手" />
+
+    <!-- 标题 -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/app_name"
+        android:textSize="26sp"
+        android:textColor="#3E2723"
+        android:textStyle="bold"
+        android:gravity="center"
+        android:layout_marginBottom="8dp" />
+
+    <!-- 副标题 -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="觉心师父 · 随身佛法智慧助手"
+        android:textSize="14sp"
+        android:textColor="#8D6E63"
+        android:gravity="center"
+        android:layout_marginBottom="4dp" />
+
+    <!-- 话术库版本信息 -->
+    <TextView
+        android:id="@+id/tv_script_info"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="本地话术库"
+        android:textSize="11sp"
+        android:textColor="#BCAAA4"
+        android:gravity="center"
+        android:layout_marginBottom="20dp" />
+
+    <!-- 功能说明 -->
+    <androidx.cardview.widget.CardView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="24dp"
+        app:cardCornerRadius="12dp"
+        app:cardElevation="2dp"
+        app:cardBackgroundColor="@android:color/white">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="✨ 如何使用"
+                android:textSize="15sp"
+                android:textColor="#3E2723"
+                android:textStyle="bold"
+                android:layout_marginBottom="8dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="1. 点击「启动悬浮球」\n2. 在微信中点击悬浮球\n3. 粘贴信众的对话内容\n4. 获得三段式佛法回复\n5. 一键复制逐段发送"
+                android:textSize="13sp"
+                android:textColor="#6D4C41"
+                android:lineSpacingExtra="6dp" />
+        </LinearLayout>
+    </androidx.cardview.widget.CardView>
+
+    <!-- 服务状态 -->
+    <TextView
+        android:id="@+id/tv_service_status"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="○ 服务未启动"
+        android:textSize="15sp"
+        android:textColor="#8D6E63"
+        android:gravity="center"
+        android:layout_marginBottom="20dp" />
+
+    <!-- 按钮区 -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="24dp"
-        android:gravity="center_horizontal">
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:layout_marginBottom="12dp">
 
-        <!-- 图标 -->
-        <TextView
-            android:layout_width="80dp"
-            android:layout_height="80dp"
-            android:layout_marginTop="40dp"
-            android:layout_marginBottom="16dp"
-            android:gravity="center"
-            android:text="🙏"
-            android:textSize="40sp"
-            android:background="@drawable/bg_circle_red"
-            android:elevation="4dp" />
-
-        <!-- 标题 -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="觉心师父回复助手"
-            android:textSize="22sp"
-            android:textColor="#3E2723"
-            android:textStyle="bold"
-            android:layout_marginBottom="4dp" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="广西兴安·回龙寺"
-            android:textSize="13sp"
-            android:textColor="#998675"
-            android:layout_marginBottom="32dp" />
-
-        <!-- 状态卡片 -->
-        <androidx.cardview.widget.CardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="24dp"
-            app:cardCornerRadius="16dp"
-            app:cardElevation="4dp"
-            app:cardBackgroundColor="#FFFFFF">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="20dp">
-
-                <TextView
-                    android:id="@+id/tv_status"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="○ 助手未启动"
-                    android:textSize="16sp"
-                    android:textColor="#3E2723"
-                    android:textStyle="bold"
-                    android:layout_marginBottom="12dp" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="启动后，悬浮球将出现在屏幕右侧边缘"
-                    android:textSize="13sp"
-                    android:textColor="#998675"
-                    android:layout_marginBottom="8dp" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="• 复制佛弟子消息 → 悬浮球自动弹出回复\n• 选择一条回复 → 自动复制到剪贴板\n• 回微信长按粘贴即可发送"
-                    android:textSize="12sp"
-                    android:textColor="#BCAAA4"
-                    android:lineSpacingExtra="4dp" />
-            </LinearLayout>
-        </androidx.cardview.widget.CardView>
-
-        <!-- 权限按钮 -->
-        <Button
-            android:id="@+id/btn_floating_permission"
-            android:layout_width="match_parent"
-            android:layout_height="50dp"
-            android:text="授权悬浮窗权限"
-            android:textSize="15sp"
-            android:textColor="#8B1A1A"
-            android:backgroundTint="#FDF5E6"
-            app:strokeColor="#8B1A1A"
-            app:strokeWidth="1dp"
-            app:cornerRadius="12dp"
-            android:layout_marginBottom="12dp"
-            style="?attr/materialButtonOutlinedStyle" />
-
-        <!-- 启动按钮 -->
         <Button
             android:id="@+id/btn_start_service"
-            android:layout_width="match_parent"
-            android:layout_height="54dp"
-            android:text="启动助手"
-            android:textSize="16sp"
-            android:textColor="#FFFFFF"
-            app:backgroundTint="#8B1A1A"
-            app:cornerRadius="12dp"
-            android:layout_marginBottom="12dp"
-            android:elevation="4dp" />
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:text="🚀 启动悬浮球"
+            android:textSize="15sp"
+            android:textColor="@android:color/white"
+            android:background="@drawable/bg_btn_primary"
+            android:layout_marginEnd="8dp" />
 
-        <!-- 停止按钮 -->
         <Button
             android:id="@+id/btn_stop_service"
-            android:layout_width="match_parent"
-            android:layout_height="50dp"
-            android:text="停止助手"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:text="⏹ 停止服务"
             android:textSize="15sp"
-            android:textColor="#8B1A1A"
-            android:backgroundTint="#FDF5E6"
-            app:strokeColor="#8B1A1A"
-            app:strokeWidth="1dp"
-            app:cornerRadius="12dp"
-            android:enabled="false"
-            style="?attr/materialButtonOutlinedStyle" />
-
-        <!-- 说明 -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="32dp"
-            android:text="阿弥陀佛 · 一切随缘"
-            android:textSize="12sp"
-            android:textColor="#BCAAA4" />
-
+            android:textColor="#6D4C41"
+            android:background="@drawable/bg_btn_secondary"
+            android:enabled="false" />
     </LinearLayout>
-</ScrollView>
+
+    <Button
+        android:id="@+id/btn_settings"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:text="🔧 高级设置（联网 · 大模型 · 话术库）"
+        android:textSize="14sp"
+        android:textColor="#8D6E63"
+        android:background="@android:color/transparent"
+        android:layout_marginBottom="20dp" />
+
+    <!-- 底部说明 -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="💡 在 App Info 中授予「在其他应用上层显示」权限"
+        android:textSize="11sp"
+        android:textColor="#BCAAA4"
+        android:gravity="center" />
+
+</LinearLayout>

@@ -1,6 +1,14 @@
-# Add project specific ProGuard rules here.
-# By default, the flags in this file are appended to flags specified
-# in the SDK tools.
+# OkHttp
+-dontwarn okhttp3.**
+-dontwarn okio.**
+-keep class okhttp3.** { *; }
+-keep interface okhttp3.** { *; }
+
+# Gson
+-keepattributes Signature
+-keepattributes *Annotation*
+-keep class com.google.gson.** { *; }
+-keep class com.juexin.assistant.model.** { *; }
 
 # Keep Kotlin Coroutines
 -keepnames class kotlinx.coroutines.internal.MainDispatcherFactory {}
@@ -15,3 +23,5 @@
 -keep class com.juexin.assistant.FloatingBallService { *; }
 -keep class com.juexin.assistant.ClipboardService { *; }
 -keep class com.juexin.assistant.ReplyGenerator { *; }
+-keep class com.juexin.assistant.ui.** { *; }
+-keep class com.juexin.assistant.network.** { *; }
