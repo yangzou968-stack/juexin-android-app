@@ -208,7 +208,6 @@ class FloatingBallService : Service() {
         // 自动触发生成
         etInput?.postDelayed({ onGenerate() }, 500)
     }
-    }
 
     private fun onPaste() {
         val clipboard = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
