@@ -39,6 +39,19 @@ jobs:
         with:
           packages: 'platforms;android-34 build-tools;34.0.0'
 
+      - name: Generate Debug Keystore
+        run: |
+          keytool -genkey -v \
+            -keystore ~/.android/debug.keystore \
+            -storepass android \
+            -alias androiddebugkey \
+            -keypass android \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -dname "CN=Android Debug,O=Android,C=US" \
+            -noprompt
+
       - name: Build Debug APK
         run: gradle assembleDebug --no-daemon
 
@@ -53,6 +66,15 @@ jobs:
         if: github.event.inputs.build_type == 'release'
         run: gradle assembleRelease --no-daemon
 
+      - name: Sign Release APK
+        if: github.event.inputs.build_type == 'release'
+        run: |
+          $ANDROID_SDK_ROOT/build-tools/34.0.0/apksigner sign \
+            --ks ~/.android/debug.keystore \
+            --ks-pass pass:android \
+            --ks-key-alias androiddebugkey \
+            app/build/outputs/apk/release/app-release-unsigned.apk
+
       - name: Upload Release APK
         if: github.event.inputs.build_type == 'release'
         uses: actions/upload-artifact@v4
@@ -63,7 +85,15 @@ jobs:
 
       - name: Build Summary
         run: |
-          echo "## APK构建完成" >> $GITHUB_STEP_SUMMARY
-          echo "✅ Debug APK 可在本页底部 Artifacts 区域下载" >> $GITHUB_STEP_SUMMARY
-          echo "📱 下载后直接安装到安卓手机即可" >> $GITHUB_STEP_SUMMARY
-          echo "🖱️ 首次使用需在设置中授予「悬浮窗」权限" >> $GITHUB_STEP_SUMMARY
+          echo "## APK 构建完成" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 下载说明" >> $GITHUB_STEP_SUMMARY
+          echo "1. 在本页底部 **Artifacts** 区域下载 \`juexin-assistant-debug\`" >> $GITHUB_STEP_SUMMARY
+          echo "2. 解压 zip 得到 \`app-debug.apk\`" >> $GITHUB_STEP_SUMMARY
+          echo "3. 传到手机安装即可" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 安装须知" >> $GITHUB_STEP_SUMMARY
+          echo "- ⚠️ 需要 **Android 8.0 及以上**系统" >> $GITHUB_STEP_SUMMARY
+          echo "- ⚠️ 安装时如提示「未知来源」，请允许「浏览器」或「文件管理器」安装未知应用" >> $GITHUB_STEP_SUMMARY
+          echo "- ⚠️ 首次使用需在设置中授予「悬浮窗」权限" >> $GITHUB_STEP_SUMMARY
+          echo "- ⚠️ 如提示「解析包错误」，请检查手机系统是否 >= Android 8.0" >> $GITHUB_STEP_SUMMARY
