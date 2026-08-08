@@ -44,9 +44,11 @@ class FloatingBallService : Service() {
     companion object {
         const val CHANNEL_ID = "floating_ball_channel"
         const val NOTIFICATION_ID = 1
+        const val ERROR_NOTIFICATION_ID = 999
         const val ACTION_STOP = "com.juexin.assistant.STOP"
         const val ACTION_SHOW_REPLIES = "com.juexin.assistant.SHOW_REPLIES"
         const val EXTRA_CLIPBOARD_TEXT = "clipboard_text"
+        val TAG = FloatingBallService::class.java.simpleName
 
         private var instance: FloatingBallService? = null
         fun getInstance(): FloatingBallService? = instance
@@ -107,6 +109,10 @@ class FloatingBallService : Service() {
         serviceScope.cancel()
         removeAllViews()
         try { unregisterReceiver(clipboardReceiver) } catch (_: Exception) {}
+        try {
+            val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+            nm.cancel(ERROR_NOTIFICATION_ID)
+        } catch (_: Exception) {}
         super.onDestroy()
     }
 
@@ -173,9 +179,14 @@ class FloatingBallService : Service() {
             inputPanel?.let {
                 try { windowManager.removeView(it) } catch (_: Exception) {}
             }
+            inputPanel = null
             resultPanel?.let {
                 try { windowManager.removeView(it) } catch (_: Exception) {}
             }
+            resultPanel = null
+
+            // 悬浮球变暗，表示已按下
+            floatingView?.findViewById<ImageView>(R.id.iv_icon)?.alpha = 0.4f
 
             inputPanel = LayoutInflater.from(this).inflate(R.layout.panel_input, null).apply {
                 etInput = findViewById(R.id.et_input)
@@ -184,38 +195,32 @@ class FloatingBallService : Service() {
                 findViewById<ImageView>(R.id.iv_close).setOnClickListener { closeInputPanel() }
             }
 
-            val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+            val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
             else WindowManager.LayoutParams.TYPE_PHONE
 
-            val params = WindowManager.LayoutParams(
-                WindowManager.LayoutParams.MATCH_PARENT,
-                WindowManager.LayoutParams.WRAP_CONTENT,
-                flags,
-                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
-                        WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH,
-                PixelFormat.TRANSLUCENT
-            ).apply {
+            val params = WindowManager.LayoutParams().apply {
+                width = WindowManager.LayoutParams.MATCH_PARENT
+                height = WindowManager.LayoutParams.WRAP_CONTENT
+                this.type = type
+                flags = WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
+                format = PixelFormat.TRANSLUCENT
                 gravity = Gravity.BOTTOM
-                softInputMode = WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE
+                softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
             }
 
             windowManager.addView(inputPanel, params)
 
-            // 延迟弹出键盘（Android 13+ 服务中弹键盘可能受限，用 try-catch 保护）
+            // 不自动弹键盘，由用户点击输入框触发
             etInput?.postDelayed({
-                try {
-                    etInput?.requestFocus()
-                    val imm = getSystemService(INPUT_METHOD_SERVICE) as? InputMethodManager
-                    imm?.showSoftInput(etInput, InputMethodManager.SHOW_IMPLICIT)
-                } catch (_: Exception) {
-                    // 键盘弹出失败不影响主流程
-                }
-            }, 300)
+                etInput?.requestFocus()
+            }, 200)
         } catch (e: Exception) {
-            // 面板显示失败，回退到悬浮球状态
-            Toast.makeText(this, "面板打开失败，请重试", Toast.LENGTH_SHORT).show()
-            android.util.Log.e("FloatingBallService", "showInputPanel error", e)
+            Log.e(TAG, "面板打开失败", e)
+            floatingView?.findViewById<ImageView>(R.id.iv_icon)?.alpha = 1.0f
+            inputPanel = null
+            // Toast 在 Service 中可能不显示，用 Notification 替代
+            showErrorNotification("面板打开失败，请检查悬浮窗权限")
         }
     }
 
@@ -352,6 +357,27 @@ class FloatingBallService : Service() {
             try { windowManager.removeView(it) } catch (_: Exception) {}
         }
         inputPanel = null
+        floatingView?.findViewById<ImageView>(R.id.iv_icon)?.alpha = 1.0f
+    }
+
+    private fun showErrorNotification(msg: String) {
+        try {
+            val channelId = "error_channel"
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val channel = NotificationChannel(channelId, "错误通知", NotificationManager.IMPORTANCE_HIGH)
+                val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+                nm.createNotificationChannel(channel)
+            }
+            val n = NotificationCompat.Builder(this, channelId)
+                .setSmallIcon(android.R.drawable.ic_dialog_alert)
+                .setContentTitle("觉心助手")
+                .setContentText(msg)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setAutoCancel(true)
+                .build()
+            val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+            nm.notify(ERROR_NOTIFICATION_ID, n)
+        } catch (_: Exception) {}
     }
 
     private fun closeResultPanel() {
