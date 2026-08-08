@@ -38,11 +38,14 @@ class FloatingBallService : Service() {
 
     private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private var generateJob: Job? = null
+    private lateinit var clipboardReceiver: BroadcastReceiver
 
     companion object {
         const val CHANNEL_ID = "floating_ball_channel"
         const val NOTIFICATION_ID = 1
         const val ACTION_STOP = "com.juexin.assistant.STOP"
+        const val ACTION_SHOW_REPLIES = "com.juexin.assistant.SHOW_REPLIES"
+        const val EXTRA_CLIPBOARD_TEXT = "clipboard_text"
 
         private var instance: FloatingBallService? = null
         fun getInstance(): FloatingBallService? = instance
@@ -65,6 +68,26 @@ class FloatingBallService : Service() {
                 serviceScope
             )
         }
+
+        // 注册剪贴板广播接收器
+        clipboardReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                val text = intent?.getStringExtra(EXTRA_CLIPBOARD_TEXT) ?: return
+                showInputPanelWithText(text)
+            }
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(
+                clipboardReceiver,
+                IntentFilter(ACTION_SHOW_REPLIES),
+                RECEIVER_NOT_EXPORTED
+            )
+        } else {
+            registerReceiver(
+                clipboardReceiver,
+                IntentFilter(ACTION_SHOW_REPLIES)
+            )
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -82,6 +105,7 @@ class FloatingBallService : Service() {
         instance = null
         serviceScope.cancel()
         removeAllViews()
+        try { unregisterReceiver(clipboardReceiver) } catch (_: Exception) {}
         super.onDestroy()
     }
 
@@ -173,6 +197,17 @@ class FloatingBallService : Service() {
             val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
             imm.showSoftInput(etInput, InputMethodManager.SHOW_IMPLICIT)
         }, 200)
+    }
+
+    /**
+     * 从剪贴板监听到文本后，自动弹出输入面板并预填内容
+     */
+    private fun showInputPanelWithText(text: String) {
+        showInputPanel()
+        etInput?.post { etInput?.setText(text) }
+        // 自动触发生成
+        etInput?.postDelayed({ onGenerate() }, 500)
+    }
     }
 
     private fun onPaste() {
