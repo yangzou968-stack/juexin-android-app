@@ -9,9 +9,11 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.graphics.PixelFormat
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.view.*
-import android.view.animation.AccelerateDecelerateInterpolator
+import android.view.animation.OvershootInterpolator
 import android.widget.*
 import androidx.core.app.NotificationCompat
 import androidx.lifecycle.LifecycleService
@@ -25,6 +27,9 @@ class FloatingBallService : LifecycleService() {
     private var replyPanelBinding: PanelReplyBinding? = null
 
     private val replyGenerator = ReplyGenerator()
+    private val handler = Handler(Looper.getMainLooper())
+    private var clipboardManager: ClipboardManager? = null
+    private var lastClipText = ""
 
     companion object {
         var isRunning = false
@@ -41,8 +46,16 @@ class FloatingBallService : LifecycleService() {
         createNotificationChannel()
         startForeground(NOTIFICATION_ID, createNotification())
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
+        clipboardManager = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
         createFloatingBall()
         registerClipboardReceiver()
+        // 启动剪贴板轮询（Android 10+ 后台无法用 listener，改用轮询）
+        handler.post(object : Runnable {
+            override fun run() {
+                checkClipboard()
+                handler.postDelayed(this, 1500)
+            }
+        })
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -57,6 +70,7 @@ class FloatingBallService : LifecycleService() {
 
     override fun onDestroy() {
         isRunning = false
+        handler.removeCallbacksAndMessages(null)
         removeFloatingBall()
         removeReplyPanel()
         unregisterReceiver(clipboardReceiver)
@@ -88,7 +102,7 @@ class FloatingBallService : LifecycleService() {
         )
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("觉心助手")
-            .setContentText("悬浮球已就绪 · 长按复制消息后自动弹出回复")
+            .setContentText("复制消息后点悬浮球生成回复")
             .setSmallIcon(android.R.drawable.ic_menu_edit)
             .setOngoing(true)
             .setContentIntent(pendingIntent)
@@ -114,19 +128,41 @@ class FloatingBallService : LifecycleService() {
         }
     }
 
+    private fun checkClipboard() {
+        try {
+            val clip = clipboardManager?.primaryClip ?: return
+            if (clip.itemCount == 0) return
+            val text = clip.getItemAt(0).text?.toString() ?: return
+            if (text == lastClipText || text.isBlank()) return
+            if (text.length < 4) return  // 至少4字
+            lastClipText = text
+            showReplyPanel(text)
+        } catch (_: Exception) {}
+    }
+
+    private fun readClipboardText(): String? {
+        return try {
+            clipboardManager?.primaryClip?.getItemAt(0)?.text?.toString()
+        } catch (_: Exception) { null }
+    }
+
     // ========== 悬浮球 ==========
 
     private fun createFloatingBall() {
         val ball = ImageView(this).apply {
             setImageResource(android.R.drawable.ic_menu_edit)
             setBackgroundColor(0xDD8B1A1A.toInt())
-            setPadding(16, 16, 16, 16)
+            setPadding(20, 20, 20, 20)
             alpha = 0.85f
         }
 
+        val screenWidth = windowManager?.defaultDisplay?.width ?: 1080
+        val screenHeight = windowManager?.defaultDisplay?.height ?: 1920
+        val ballSize = dpToPx(48)
+
         val params = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.WRAP_CONTENT,
+            ballSize,
+            ballSize,
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
             else
@@ -135,48 +171,53 @@ class FloatingBallService : LifecycleService() {
                     WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
             PixelFormat.TRANSLUCENT
         ).apply {
-            gravity = Gravity.END or Gravity.CENTER_VERTICAL
-            x = 0
-            y = 0
+            // 使用 TOP|START 绝对定位，不再用 END 导致坐标方向混乱
+            gravity = Gravity.TOP or Gravity.START
+            x = screenWidth - ballSize - dpToPx(8)
+            y = screenHeight / 3
         }
 
-        // 拖拽悬浮球
-        var initialX = 0
-        var initialY = 0
-        var initialTouchX = 0f
-        var initialTouchY = 0f
-        var isDragging = false
+        var downTime = 0L
+        var downRawX = 0f
+        var downRawY = 0f
+        var startX = params.x
+        var startY = params.y
+        var hasMoved = false
 
-        ball.setOnTouchListener { view, event ->
+        ball.setOnTouchListener { _, event ->
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
-                    initialX = params.x
-                    initialY = params.y
-                    initialTouchX = event.rawX
-                    initialTouchY = event.rawY
-                    isDragging = false
+                    downTime = System.currentTimeMillis()
+                    downRawX = event.rawX
+                    downRawY = event.rawY
+                    startX = params.x
+                    startY = params.y
+                    hasMoved = false
                     true
                 }
                 MotionEvent.ACTION_MOVE -> {
-                    val dx = (event.rawX - initialTouchX).toInt()
-                    val dy = (event.rawY - initialTouchY).toInt()
-                    if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
-                        isDragging = true
+                    val dx = (event.rawX - downRawX).toInt()
+                    val dy = (event.rawY - downRawY).toInt()
+                    if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
+                        hasMoved = true
                     }
-                    params.x = initialX - dx
-                    params.y = initialY + dy
-                    windowManager?.updateViewLayout(ball, params)
+                    if (hasMoved) {
+                        params.x = startX + dx
+                        params.y = startY + dy
+                        windowManager?.updateViewLayout(ball, params)
+                    }
                     true
                 }
                 MotionEvent.ACTION_UP -> {
-                    if (!isDragging) {
-                        // 点击悬浮球 → 读取剪贴板并显示回复
+                    val duration = System.currentTimeMillis() - downTime
+                    if (!hasMoved && duration < 400) {
+                        // 点击：读剪贴板显示回复
                         onFloatingBallClicked()
                     }
-                    // 吸附边缘
-                    val screenWidth = windowManager?.defaultDisplay?.width ?: 1080
-                    params.x = if (params.x + ball.width / 2 > screenWidth / 2) 0 else screenWidth - ball.width
-                    windowManager?.updateViewLayout(ball, params)
+                    if (hasMoved) {
+                        // 拖拽结束：吸附到最近边缘
+                        snapToEdge(ball, params, screenWidth, screenHeight)
+                    }
                     true
                 }
                 else -> false
@@ -187,20 +228,34 @@ class FloatingBallService : LifecycleService() {
         floatingBall = ball
     }
 
-    private fun onFloatingBallClicked() {
-        // 读取剪贴板内容
-        val clipboard = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
-        val clip = clipboard.primaryClip
-        if (clip != null && clip.itemCount > 0) {
-            val text = clip.getItemAt(0).text?.toString()
-            if (!text.isNullOrBlank()) {
-                showReplyPanel(text)
-            } else {
-                showToast("请先在微信中复制佛弟子的消息")
-            }
+    private fun snapToEdge(
+        ball: View,
+        params: WindowManager.LayoutParams,
+        screenWidth: Int,
+        screenHeight: Int
+    ) {
+        val centerX = params.x + ball.width / 2
+        val targetX = if (centerX > screenWidth / 2) {
+            screenWidth - ball.width - dpToPx(8)
         } else {
-            showToast("请先在微信中复制佛弟子的消息")
+            dpToPx(8)
         }
+        params.x = targetX
+        params.y = params.y.coerceIn(dpToPx(40), screenHeight - ball.height - dpToPx(40))
+        windowManager?.updateViewLayout(ball, params)
+    }
+
+    private fun onFloatingBallClicked() {
+        val text = readClipboardText()
+        if (!text.isNullOrBlank() && text.length >= 2) {
+            showReplyPanel(text)
+        } else {
+            showToast("请先在微信中长按复制佛弟子的消息，再点悬浮球")
+        }
+    }
+
+    private fun dpToPx(dp: Int): Int {
+        return (dp * resources.displayMetrics.density).toInt()
     }
 
     private fun removeFloatingBall() {
@@ -263,19 +318,22 @@ class FloatingBallService : LifecycleService() {
         windowManager?.addView(panel, params)
 
         // 入场动画
-        panel.translationY = panel.height.toFloat()
+        panel.translationY = 600f
         panel.animate()
             .translationY(0f)
-            .setDuration(300)
-            .setInterpolator(AccelerateDecelerateInterpolator())
+            .setDuration(350)
+            .setInterpolator(OvershootInterpolator(0.5f))
             .start()
     }
 
     private fun copyAndDismiss(text: String) {
-        val clipboard = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
-        val clip = ClipData.newPlainText("juexin_reply", text)
-        clipboard.setPrimaryClip(clip)
-        showToast("已复制，回微信粘贴即可发送")
+        try {
+            val clip = ClipData.newPlainText("juexin_reply", text)
+            clipboardManager?.setPrimaryClip(clip)
+            showToast("已复制，回微信粘贴即可发送")
+        } catch (e: Exception) {
+            showToast("复制失败，请重试")
+        }
         removeReplyPanel()
     }
 
