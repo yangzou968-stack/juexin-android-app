@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="temple_red">#8B1A1A</color>
+    <color name="temple_gold">#C9A96E</color>
+    <color name="temple_dark">#3E2723</color>
+    <color name="temple_cream">#FDF5E6</color>
+    <color name="temple_light">#FFF8F0</color>
+    <color name="temple_accent">#D4A574</color>
+</resources>

@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FDF5E6">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="24dp"
+        android:gravity="center_horizontal">
+
+        <!-- 图标 -->
+        <TextView
+            android:layout_width="80dp"
+            android:layout_height="80dp"
+            android:layout_marginTop="40dp"
+            android:layout_marginBottom="16dp"
+            android:gravity="center"
+            android:text="🙏"
+            android:textSize="40sp"
+            android:background="@drawable/bg_circle_red"
+            android:elevation="4dp" />
+
+        <!-- 标题 -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="觉心师父回复助手"
+            android:textSize="22sp"
+            android:textColor="#3E2723"
+            android:textStyle="bold"
+            android:layout_marginBottom="4dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="广西兴安·回龙寺"
+            android:textSize="13sp"
+            android:textColor="#998675"
+            android:layout_marginBottom="32dp" />
+
+        <!-- 状态卡片 -->
+        <androidx.cardview.widget.CardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="24dp"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="4dp"
+            app:cardBackgroundColor="#FFFFFF">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="20dp">
+
+                <TextView
+                    android:id="@+id/tv_status"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="○ 助手未启动"
+                    android:textSize="16sp"
+                    android:textColor="#3E2723"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="12dp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="启动后，悬浮球将出现在屏幕右侧边缘"
+                    android:textSize="13sp"
+                    android:textColor="#998675"
+                    android:layout_marginBottom="8dp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="• 复制佛弟子消息 → 悬浮球自动弹出回复\n• 选择一条回复 → 自动复制到剪贴板\n• 回微信长按粘贴即可发送"
+                    android:textSize="12sp"
+                    android:textColor="#BCAAA4"
+                    android:lineSpacingExtra="4dp" />
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+
+        <!-- 权限按钮 -->
+        <Button
+            android:id="@+id/btn_floating_permission"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:text="授权悬浮窗权限"
+            android:textSize="15sp"
+            android:textColor="#8B1A1A"
+            android:backgroundTint="#FDF5E6"
+            app:strokeColor="#8B1A1A"
+            app:strokeWidth="1dp"
+            app:cornerRadius="12dp"
+            android:layout_marginBottom="12dp"
+            style="?attr/materialButtonOutlinedStyle" />
+
+        <!-- 启动按钮 -->
+        <Button
+            android:id="@+id/btn_start_service"
+            android:layout_width="match_parent"
+            android:layout_height="54dp"
+            android:text="启动助手"
+            android:textSize="16sp"
+            android:textColor="#FFFFFF"
+            app:backgroundTint="#8B1A1A"
+            app:cornerRadius="12dp"
+            android:layout_marginBottom="12dp"
+            android:elevation="4dp" />
+
+        <!-- 停止按钮 -->
+        <Button
+            android:id="@+id/btn_stop_service"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:text="停止助手"
+            android:textSize="15sp"
+            android:textColor="#8B1A1A"
+            android:backgroundTint="#FDF5E6"
+            app:strokeColor="#8B1A1A"
+            app:strokeWidth="1dp"
+            app:cornerRadius="12dp"
+            android:enabled="false"
+            style="?attr/materialButtonOutlinedStyle" />
+
+        <!-- 说明 -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="32dp"
+            android:text="阿弥陀佛 · 一切随缘"
+            android:textSize="12sp"
+            android:textColor="#BCAAA4" />
+
+    </LinearLayout>
+</ScrollView>

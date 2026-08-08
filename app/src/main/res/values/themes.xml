@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.JuexinAssistant" parent="Theme.MaterialComponents.Light.NoActionBar">
+        <item name="colorPrimary">#8B1A1A</item>
+        <item name="colorPrimaryVariant">#6D1414</item>
+        <item name="colorOnPrimary">#FFFFFF</item>
+        <item name="colorSecondary">#C9A96E</item>
+        <item name="colorOnSecondary">#3E2723</item>
+        <item name="android:statusBarColor">#8B1A1A</item>
+        <item name="android:navigationBarColor">#FDF5E6</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>
