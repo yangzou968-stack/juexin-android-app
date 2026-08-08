@@ -2,6 +2,8 @@ package com.juexin.assistant
 
 import android.app.*
 import android.content.BroadcastReceiver
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
