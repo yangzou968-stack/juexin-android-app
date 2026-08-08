@@ -6,6 +6,7 @@ import android.graphics.*
 import android.os.Build
 import android.os.IBinder
 import android.text.TextUtils
+import android.util.Log
 import android.view.*
 import android.view.inputmethod.InputMethodManager
 import android.widget.*
@@ -168,35 +169,54 @@ class FloatingBallService : Service() {
     // ==================== 输入面板 ====================
 
     private fun showInputPanel() {
-        inputPanel?.let { windowManager.removeView(it) }
-        resultPanel?.let { windowManager.removeView(it) }
+        try {
+            inputPanel?.let {
+                try { windowManager.removeView(it) } catch (_: Exception) {}
+            }
+            resultPanel?.let {
+                try { windowManager.removeView(it) } catch (_: Exception) {}
+            }
 
-        inputPanel = LayoutInflater.from(this).inflate(R.layout.panel_input, null).apply {
-            etInput = findViewById(R.id.et_input)
-            findViewById<Button>(R.id.btn_generate).setOnClickListener { onGenerate() }
-            findViewById<Button>(R.id.btn_paste).setOnClickListener { onPaste() }
-            findViewById<ImageView>(R.id.iv_close).setOnClickListener { closeInputPanel() }
-        }
+            inputPanel = LayoutInflater.from(this).inflate(R.layout.panel_input, null).apply {
+                etInput = findViewById(R.id.et_input)
+                findViewById<Button>(R.id.btn_generate).setOnClickListener { onGenerate() }
+                findViewById<Button>(R.id.btn_paste).setOnClickListener { onPaste() }
+                findViewById<ImageView>(R.id.iv_close).setOnClickListener { closeInputPanel() }
+            }
 
-        val params = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+            val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-            else WindowManager.LayoutParams.TYPE_PHONE,
-            WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
-            PixelFormat.TRANSLUCENT
-        ).apply {
-            gravity = Gravity.BOTTOM
-            softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
-        }
+            else WindowManager.LayoutParams.TYPE_PHONE
 
-        windowManager.addView(inputPanel, params)
-        etInput?.postDelayed({
-            etInput?.requestFocus()
-            val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
-            imm.showSoftInput(etInput, InputMethodManager.SHOW_IMPLICIT)
-        }, 200)
+            val params = WindowManager.LayoutParams(
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                flags,
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                        WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH,
+                PixelFormat.TRANSLUCENT
+            ).apply {
+                gravity = Gravity.BOTTOM
+                softInputMode = WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE
+            }
+
+            windowManager.addView(inputPanel, params)
+
+            // 延迟弹出键盘（Android 13+ 服务中弹键盘可能受限，用 try-catch 保护）
+            etInput?.postDelayed({
+                try {
+                    etInput?.requestFocus()
+                    val imm = getSystemService(INPUT_METHOD_SERVICE) as? InputMethodManager
+                    imm?.showSoftInput(etInput, InputMethodManager.SHOW_IMPLICIT)
+                } catch (_: Exception) {
+                    // 键盘弹出失败不影响主流程
+                }
+            }, 300)
+        } catch (e: Exception) {
+            // 面板显示失败，回退到悬浮球状态
+            Toast.makeText(this, "面板打开失败，请重试", Toast.LENGTH_SHORT).show()
+            android.util.Log.e("FloatingBallService", "showInputPanel error", e)
+        }
     }
 
     /**
@@ -329,16 +349,16 @@ class FloatingBallService : Service() {
 
     private fun closeInputPanel() {
         inputPanel?.let {
-            windowManager.removeView(it)
-            inputPanel = null
+            try { windowManager.removeView(it) } catch (_: Exception) {}
         }
+        inputPanel = null
     }
 
     private fun closeResultPanel() {
         resultPanel?.let {
-            windowManager.removeView(it)
-            resultPanel = null
+            try { windowManager.removeView(it) } catch (_: Exception) {}
         }
+        resultPanel = null
     }
 
     private fun removeAllViews() {
